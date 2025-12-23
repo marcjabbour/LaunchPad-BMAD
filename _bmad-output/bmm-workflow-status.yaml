@@ -1,0 +1,42 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+#   - skipped: Optional/conditional workflow that was skipped
+
+generated: "2025-12-22"
+project: "LaunchPad"
+project_type: "product"
+selected_track: "method"
+field_type: "greenfield"
+workflow_path: "method-greenfield"
+workflow_status:
+  # Discovery Phase (Optional)
+  brainstorm-project: "_bmad-output/analysis/brainstorming-session-2025-12-22.md"
+  research: "_bmad-output/analysis/research/technical-knowledge-management-systems-research-2025-12-22.md"
+  product-brief: "_bmad-output/analysis/product-brief-LaunchPad-2025-12-22.md"
+
+  # Planning Phase
+  prd: "_bmad-output/prd.md"
+  create-ux-design: "conditional"
+
+  # Solutioning Phase
+  create-architecture: "_bmad-output/architecture.md"
+  create-epics-and-stories: "_bmad-output/epics-and-stories.md"
+  test-design: "_bmad-output/test-design.md"
+  validate-architecture: "_bmad-output/architecture-validation.md"
+  implementation-readiness: "_bmad-output/implementation-readiness.md"
+
+  # Implementation Phase
+  sprint-planning: "_bmad-output/sprint-planning.md"
