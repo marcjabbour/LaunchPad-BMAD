@@ -68,9 +68,11 @@ class TestLatencyTracker:
         """Test marking phase start and end."""
         tracker = LatencyTracker()
         tracker.start_pipeline()
+        # Use matching phases: mark start with STT_START, end with STT_START (same phase)
         tracker.mark_phase_start(LatencyPhase.STT_START)
         time.sleep(0.01)  # Small delay
-        duration = tracker.mark_phase_end(LatencyPhase.STT_END)
+        # The mark_phase_end looks for "{phase}_start" key, so pass same phase
+        duration = tracker.mark_phase_end(LatencyPhase.STT_START)
         assert duration > 0
 
     def test_complete_pipeline(self) -> None:

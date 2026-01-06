@@ -42,7 +42,7 @@ story_location: _bmad-output/stories
 development_status:
   # Epic 1: Foundation Infrastructure (Weeks 1-4, Sprints 1-2)
   epic-1: in-progress
-  1-1-livekit-voice-processing-setup: in-progress
+  1-1-livekit-voice-processing-setup: review
   1-2-basic-agent-intelligence: ready-for-dev
   1-3-google-meet-integration: ready-for-dev
   epic-1-retrospective: optional
