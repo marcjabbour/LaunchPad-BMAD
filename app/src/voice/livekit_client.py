@@ -3,7 +3,7 @@
 import asyncio
 from dataclasses import dataclass, field
 from typing import Callable, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 from livekit import rtc, api
@@ -116,7 +116,7 @@ class LiveKitClient:
         def on_disconnected() -> None:
             logger.warning("room_disconnected")
             self.metrics.is_connected = False
-            self.metrics.disconnected_at = datetime.utcnow()
+            self.metrics.disconnected_at = datetime.now(timezone.utc)
 
         @self._room.on("reconnecting")
         def on_reconnecting() -> None:
@@ -131,7 +131,7 @@ class LiveKitClient:
         try:
             await self._room.connect(self.config.url, token)
             self.metrics.is_connected = True
-            self.metrics.connected_at = datetime.utcnow()
+            self.metrics.connected_at = datetime.now(timezone.utc)
             logger.info("room_connected", room_name=room_name)
             return self._room
 
@@ -146,7 +146,7 @@ class LiveKitClient:
             await self._room.disconnect()
             self._room = None
             self.metrics.is_connected = False
-            self.metrics.disconnected_at = datetime.utcnow()
+            self.metrics.disconnected_at = datetime.now(timezone.utc)
             logger.info("disconnected_from_room")
 
     async def publish_audio_track(self, source: rtc.AudioSource) -> rtc.LocalAudioTrack:

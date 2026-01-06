@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
 from enum import Enum
 
@@ -13,6 +13,54 @@ from livekit.plugins import elevenlabs
 from .config import ElevenLabsConfig
 
 logger = structlog.get_logger(__name__)
+
+
+async def retry_async(
+    func,
+    max_retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 5.0,
+    exponential_base: float = 2.0,
+):
+    """
+    Retry an async function with exponential backoff.
+
+    Args:
+        func: Async callable to retry
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay between retries in seconds
+        max_delay: Maximum delay between retries
+        exponential_base: Base for exponential backoff calculation
+
+    Returns:
+        Result from successful function call
+
+    Raises:
+        Last exception if all retries fail
+    """
+    last_exception = None
+    for attempt in range(max_retries + 1):
+        try:
+            return await func()
+        except Exception as e:
+            last_exception = e
+            if attempt < max_retries:
+                delay = min(base_delay * (exponential_base ** attempt), max_delay)
+                logger.warning(
+                    "tts_retry_attempt",
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    delay=delay,
+                    error=str(e),
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error(
+                    "tts_retry_exhausted",
+                    max_retries=max_retries,
+                    error=str(e),
+                )
+    raise last_exception
 
 
 class SynthesisState(Enum):
@@ -115,37 +163,44 @@ class TTSPipeline:
             sample_rate=self.config.elevenlabs_config.sample_rate,
         )
 
-    async def synthesize(self, text: str) -> SynthesisResult:
+    async def synthesize(self, text: str, max_retries: int = 3) -> SynthesisResult:
         """
-        Synthesize text to audio.
+        Synthesize text to audio with retry support.
 
         Args:
             text: The text to synthesize
+            max_retries: Maximum retry attempts for transient failures
 
         Returns:
             SynthesisResult containing audio data and metrics
 
         Raises:
-            RuntimeError: If synthesis fails
+            RuntimeError: If synthesis fails after all retries
         """
         if not text.strip():
             raise ValueError("Cannot synthesize empty text")
 
         self.state = SynthesisState.SYNTHESIZING
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         audio_chunks: list[bytes] = []
 
         logger.info("tts_synthesis_started", text_length=len(text))
 
-        try:
-            # Use streaming synthesis and collect all chunks
+        async def _collect_audio():
+            nonlocal audio_chunks
+            audio_chunks = []
             stream = self._tts.synthesize(text)
             async for chunk in stream:
                 if chunk.frame and chunk.frame.data:
                     audio_chunks.append(chunk.frame.data.tobytes())
+            return audio_chunks
+
+        try:
+            # Use streaming synthesis and collect all chunks with retry
+            await retry_async(_collect_audio, max_retries=max_retries)
 
             audio_data = b"".join(audio_chunks)
-            latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+            latency_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
 
             # Estimate audio duration (assuming 16-bit samples)
             sample_rate = self.config.elevenlabs_config.sample_rate
@@ -204,7 +259,7 @@ class TTSPipeline:
             raise ValueError("Cannot synthesize empty text")
 
         self.state = SynthesisState.STREAMING
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         first_chunk_time: Optional[datetime] = None
         total_bytes = 0
 
@@ -215,7 +270,7 @@ class TTSPipeline:
             async for chunk in stream:
                 if chunk.frame and chunk.frame.data:
                     if first_chunk_time is None:
-                        first_chunk_time = datetime.utcnow()
+                        first_chunk_time = datetime.now(timezone.utc)
                         ttfb_ms = (first_chunk_time - start_time).total_seconds() * 1000
                         logger.debug("tts_first_chunk", ttfb_ms=round(ttfb_ms, 2))
 
@@ -224,7 +279,7 @@ class TTSPipeline:
                     yield audio_bytes
 
             # Update metrics after streaming completes
-            latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+            latency_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             self.metrics.total_syntheses += 1
             self.metrics.successful_syntheses += 1
             self.metrics.total_latency_ms += latency_ms

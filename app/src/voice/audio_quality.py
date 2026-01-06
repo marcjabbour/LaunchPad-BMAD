@@ -2,8 +2,8 @@
 
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Optional, List
+from datetime import datetime, timezone
+from typing import Optional
 from enum import Enum
 from statistics import mean, stdev
 
@@ -30,7 +30,7 @@ class LatencyMeasurement:
 
     phase: LatencyPhase
     duration_ms: float
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict = field(default_factory=dict)
 
 
@@ -42,7 +42,7 @@ class PipelineLatency:
     processing_latency_ms: float
     tts_latency_ms: float
     total_latency_ms: float
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def meets_target(self) -> bool:
@@ -66,7 +66,7 @@ class LatencyTracker:
     target_tts_ms: float = 500.0
     window_size: int = 100
 
-    _measurements: List[PipelineLatency] = field(default_factory=list)
+    _measurements: list[PipelineLatency] = field(default_factory=list)
     _current_phases: dict = field(default_factory=dict)
     _start_time: Optional[float] = None
 
@@ -184,7 +184,7 @@ class AudioQualityMetrics:
     - Quality scoring
     """
 
-    quality_scores: List[float] = field(default_factory=list)
+    quality_scores: list[float] = field(default_factory=list)
     window_size: int = 50
 
     # Quality thresholds

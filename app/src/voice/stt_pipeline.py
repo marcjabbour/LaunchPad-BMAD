@@ -2,9 +2,10 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncIterator, Callable, Optional
 from enum import Enum
+from functools import wraps
 
 import structlog
 from livekit.agents import stt
@@ -13,6 +14,54 @@ from livekit.plugins import deepgram
 from .config import DeepgramConfig
 
 logger = structlog.get_logger(__name__)
+
+
+async def retry_async(
+    func,
+    max_retries: int = 3,
+    base_delay: float = 0.5,
+    max_delay: float = 5.0,
+    exponential_base: float = 2.0,
+):
+    """
+    Retry an async function with exponential backoff.
+
+    Args:
+        func: Async callable to retry
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay between retries in seconds
+        max_delay: Maximum delay between retries
+        exponential_base: Base for exponential backoff calculation
+
+    Returns:
+        Result from successful function call
+
+    Raises:
+        Last exception if all retries fail
+    """
+    last_exception = None
+    for attempt in range(max_retries + 1):
+        try:
+            return await func()
+        except Exception as e:
+            last_exception = e
+            if attempt < max_retries:
+                delay = min(base_delay * (exponential_base ** attempt), max_delay)
+                logger.warning(
+                    "retry_attempt",
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    delay=delay,
+                    error=str(e),
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.error(
+                    "retry_exhausted",
+                    max_retries=max_retries,
+                    error=str(e),
+                )
+    raise last_exception
 
 
 class TranscriptionState(Enum):
@@ -176,7 +225,7 @@ class STTPipeline:
             return None
 
         # Calculate latency (time from speech end to transcription)
-        receive_time = datetime.utcnow().timestamp()
+        receive_time = datetime.now(timezone.utc).timestamp()
         latency_ms = (receive_time - event.alternatives[0].start_time) * 1000
 
         result = TranscriptionResult(
@@ -206,28 +255,37 @@ class STTPipeline:
 
         return result
 
-    async def transcribe_audio(self, audio_data: bytes, sample_rate: int = 16000) -> str:
+    async def transcribe_audio(
+        self,
+        audio_data: bytes,
+        sample_rate: int = 16000,
+        max_retries: int = 3,
+    ) -> str:
         """
-        Transcribe a single audio buffer.
+        Transcribe a single audio buffer with retry support.
 
         Args:
             audio_data: Raw audio bytes
             sample_rate: Audio sample rate in Hz
+            max_retries: Maximum retry attempts for transient failures
 
         Returns:
             Transcribed text
         """
         self.state = TranscriptionState.PROCESSING
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
-        try:
-            # Use recognize for single-shot transcription
-            result = await self._stt.recognize(
+        async def _do_transcribe():
+            return await self._stt.recognize(
                 buffer=audio_data,
                 sample_rate=sample_rate,
             )
 
-            latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        try:
+            # Use recognize for single-shot transcription with retry
+            result = await retry_async(_do_transcribe, max_retries=max_retries)
+
+            latency_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
             text = result.text if result else ""
 
             self.metrics.total_transcriptions += 1
