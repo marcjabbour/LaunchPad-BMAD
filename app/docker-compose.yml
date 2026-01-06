@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  launchpad-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: launchpad-voice-agent
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=DEBUG
+    volumes:
+      # Mount source for development hot-reload
+      - ./src:/app/src:ro
+      - ./main.py:/app/main.py:ro
+    restart: unless-stopped
+    networks:
+      - launchpad-network
+
+  # Optional: Local LiveKit server for development
+  # Uncomment if you want to run LiveKit locally instead of using cloud
+  # livekit:
+  #   image: livekit/livekit-server:latest
+  #   container_name: livekit-server
+  #   ports:
+  #     - "7880:7880"
+  #     - "7881:7881"
+  #     - "7882:7882/udp"
+  #   environment:
+  #     - LIVEKIT_KEYS=devkey:secret
+  #   command: --dev --bind 0.0.0.0
+  #   networks:
+  #     - launchpad-network
+
+networks:
+  launchpad-network:
+    driver: bridge

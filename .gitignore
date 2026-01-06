@@ -2,6 +2,9 @@
   agent/venv/
   agent/.env
   agent/__pycache__/
+  app/.env
+  app/.venv/
+  app/__pycache__/
   *.pyc
 
   # Node.js
