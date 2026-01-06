@@ -1,17 +1,23 @@
 # Python
-  agent/venv/
-  agent/.env
-  agent/__pycache__/
-  app/.env
-  app/.venv/
-  app/__pycache__/
-  *.pyc
+agent/venv/
+agent/.env
+agent/__pycache__/
+app/.env
+app/.venv/
+**/__pycache__/
+*.pyc
+.coverage
+htmlcov/
 
-  # Node.js
-  frontend/node_modules/
-  frontend/.next/
-  frontend/.env.local
+# Node.js
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
 
-  # General
-  .DS_Store
-  *.log
+# General
+.DS_Store
+*.log
+
+# IDE
+.idea/
+.vscode/
